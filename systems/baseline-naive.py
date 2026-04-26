@@ -39,13 +39,6 @@ class BaselineRecommender:
 
 if __name__ == "__main__":
     DATA_PATH = "../processed-data/cleaned_books_fantasy_paranormal.json"
-
-    import os
-    if not os.path.exists(DATA_PATH):
-        print(f"File not found: {DATA_PATH}")
-        print("Falling back to raw data...")
-        DATA_PATH = "../raw-data/goodreads_books_fantasy_paranormal.json"
-
     baseline = BaselineRecommender(top_n=10, min_ratings=1000)
 
     print("Training Naive Baseline...")
