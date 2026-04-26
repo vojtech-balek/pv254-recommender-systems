@@ -14,7 +14,7 @@ class ContentBasedRecommender:
         self.max_users = max_users
         self.book_tf_idf = None
         self.book_id_to_idx = None
-        self.vectorizer = TfidfVectorizer(max_features=15000)
+        self.vectorizer = TfidfVectorizer(max_features=5000)
         self.book_ids = None
         self.books_df = pl.scan_ndjson('../processed-data/processed_books_texts.json')
         self.train_df = pl.scan_ndjson('../processed-data/train_interactions_fantasy_paranormal.json')
@@ -31,7 +31,7 @@ class ContentBasedRecommender:
         print(f"TF-IDF matrix built with shape: {self.book_tf_idf.shape}")
 
     def build_user_profiles(self):
-        grouped_train = self.train_df.group_by('user_id').agg(pl.col('book_id'))
+        grouped_train = self.train_df.group_by('user_id').agg([pl.col('book_id'), pl.col('rating')])
 
         # Limit the number of users to avoid OOM
         if self.max_users is not None:
@@ -40,21 +40,31 @@ class ContentBasedRecommender:
         users = grouped_train.collect()
         user_profiles = {}
         for row in users.iter_rows(named=True):
-            user_id = row[ 'user_id']
+            user_id = row['user_id']
             books = row['book_id']
-            valid_indices = [self.book_id_to_idx[b] for b in books if b in self.book_id_to_idx]
+            ratings = row['rating']
+
+            valid_indices = []
+            valid_ratings = []
+            for b, r in zip(books, ratings):
+                if b in self.book_id_to_idx:
+                    valid_indices.append(self.book_id_to_idx[b])
+                    valid_ratings.append(r)
+
             if valid_indices:
                 user_books_tfidf = self.book_tf_idf[valid_indices]
-                user_profile_vector = self._aggregate(user_books_tfidf)
+                user_profile_vector = self._aggregate(user_books_tfidf, valid_ratings)
                 user_profiles[user_id] = user_profile_vector
-
 
         print("Successfully built user profiles!")
         return user_profiles
 
     @staticmethod
-    def _aggregate(user_books_tfidf):
-        user_profile_matrix = user_books_tfidf.mean(axis=0)
+    def _aggregate(user_books_tfidf, ratings):
+
+        ratings_array = np.array(ratings).reshape(-1, 1) / 5.0
+        weighted_books = user_books_tfidf.multiply(ratings_array)
+        user_profile_matrix = weighted_books.mean(axis=0)
         return np.asarray(user_profile_matrix).flatten()
 
     def recommend(self, user_id, user_profiles, train_user_books, top_n=5):
@@ -79,16 +89,18 @@ class ContentBasedRecommender:
 
         return recommended
 
-    def evaluate(self, user_profiles, top_k=5):
-        print("Evaluating on test set...")
+    def evaluate(self, user_profiles, top_k=1):
+        print(f"Evaluating on test set (top_{top_k})...")
         grouped_test = self.test_df.group_by('user_id').agg(pl.col('book_id')).collect()
         test_user_books = {row['user_id']: set(map(str, row['book_id'])) for row in grouped_test.iter_rows(named=True)}
 
         grouped_train = self.train_df.group_by('user_id').agg(pl.col('book_id')).collect()
         train_user_books = {row['user_id']: set(map(str, row['book_id'])) for row in grouped_train.iter_rows(named=True)}
 
-        precisions = []
-        recalls = []
+        hits = 0
+        precision_sum = 0.0
+        recall_sum = 0.0
+        total = 0
 
         for user_id, true_books in test_user_books.items():
             if user_id not in user_profiles:
@@ -99,17 +111,25 @@ class ContentBasedRecommender:
             if not recommended:
                 continue
 
-            hits = len(set(recommended).intersection(true_books))
-            precisions.append(hits / len(recommended))
-            recalls.append(hits / len(true_books))
+            num_hits = len(set(recommended).intersection(true_books))
 
-        print(f"Precision@{top_k}: {np.mean(precisions):.4f}")
-        print(f"Recall@{top_k}: {np.mean(recalls):.4f}")
+            if num_hits > 0:
+                hits += 1
+
+            precision_sum += num_hits / len(recommended)
+            recall_sum += num_hits / len(true_books)
+            total += 1
+
+        if total > 0:
+            print(f"Hit Rate@{top_k}: {hits / total:.4f}")
+            print(f"Precision@{top_k}: {precision_sum / total:.4f}")
+            print(f"Recall@{top_k}: {recall_sum / total:.4f}")
+        else:
+            print("No users to evaluate.")
 
 
 if __name__ == "__main__":
-    # We set max_users to limit RAM usage
-    recommender = ContentBasedRecommender(max_users=1000)
+    recommender = ContentBasedRecommender(max_users=2000)
     recommender.build_tf_idf()
     user_profiles = recommender.build_user_profiles()
-    recommender.evaluate(user_profiles, top_k=5)
+    recommender.evaluate(user_profiles, top_k=10)
