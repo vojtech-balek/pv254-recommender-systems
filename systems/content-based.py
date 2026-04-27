@@ -42,7 +42,6 @@ class ContentBasedRecommender:
         self.book_ids = pdf.index.values
         self.book_id_to_idx = {self._norm_book_id(book_id): idx for idx, book_id in enumerate(self.book_ids)}
 
-        # Save book metadata for evaluation exports (use string keys)
         meta = pdf[["title", "author_names", "description"]].to_dict('index')
         self.book_info = {self._norm_book_id(k): v for k, v in meta.items()}
 
@@ -134,10 +133,7 @@ class ContentBasedRecommender:
 
             recommended = self.recommend(user_id, user_profiles, train_user_books, top_n=top_k)
 
-            if not recommended:
-                continue
-
-            num_hits = len(set(recommended).intersection(true_books))
+            num_hits = len(set(recommended).intersection(true_books)) if recommended else 0
 
             def _get_metadata(bid: str):
                 bid = self._norm_book_id(bid)
@@ -172,8 +168,8 @@ class ContentBasedRecommender:
                 if len(export_data["bad_recommendations"]) < 10:
                     export_data["bad_recommendations"].append(record)
 
-            precision_sum += num_hits / len(recommended)
-            recall_sum += num_hits / len(true_books)
+            precision_sum += num_hits / top_k
+            recall_sum += num_hits / len(true_books) if len(true_books) > 0 else 0.0
             total += 1
 
         if total > 0:
