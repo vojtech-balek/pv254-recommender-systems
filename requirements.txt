@@ -1,3 +1,4 @@
 polars
 jupyter
 torch
+scikit-learn

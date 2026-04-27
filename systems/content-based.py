@@ -50,11 +50,10 @@ class ContentBasedRecommender:
         print(f"TF-IDF matrix built with shape: {self.book_tf_idf.shape}")
 
     def build_user_profiles(self):
-        # Normalize ids in interactions as well
         train_df = self.train_df.with_columns(pl.col("work_id").cast(pl.Utf8))
         grouped_train = train_df.group_by('user_id').agg([pl.col('work_id'), pl.col('rating')])
 
-        # Limit the number of users to avoid OOM
+        # avoids OOM
         if self.max_users is not None:
             grouped_train = grouped_train.head(self.max_users)
 
@@ -159,6 +158,7 @@ class ContentBasedRecommender:
 
             record = {
                 "user_id": user_id,
+                "profile_books": [_get_metadata(b) for b in train_user_books.get(user_id, set())],
                 "recommended": [_get_metadata(b) for b in recommended],
                 "true_books": [_get_metadata(b) for b in true_books],
                 "num_hits": num_hits
