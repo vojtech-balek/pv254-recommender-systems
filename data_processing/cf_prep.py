@@ -15,7 +15,6 @@ def prepare_cf_data(train_data_path, test_data_path, output_train_path, output_t
     train_raw["user_id_enc"] = user_enc.fit_transform(train_raw["user_id"])
     train_raw["work_id_enc"] = book_enc.fit_transform(train_raw["work_id"])
 
-    # filter test set to only include users and books seen in training set, then encode
     test_raw = test_raw[
         test_raw["user_id"].isin(user_enc.classes_) &
         test_raw["work_id"].isin(book_enc.classes_)

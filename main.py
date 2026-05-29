@@ -67,7 +67,6 @@ def define_book_info_dict():
 if __name__ == "__main__":
 
     train_df, test_df = prepare_data()
-    # objective can be "rating" to predict ratings or "read_bool" for binary feedback (rated at least 3 stars or not)
     cf_recommender = CF_Recommender(top_n=10, embedding_dim=8, objective="read_bool", use_bias=False)
     train_model(cf_recommender, train_df)
 

@@ -20,7 +20,6 @@ class ContentBasedRecommender:
         self.vectorizer = TfidfVectorizer(max_features=5000)
         self.book_ids = None
 
-        # Resolve paths relative to this file so running from repo root works.
         base_dir = Path(__file__).resolve().parent
         self.books_df = pl.scan_ndjson(str(base_dir / '../processed-data/processed_books_texts.json'))
         self.train_df = pl.scan_ndjson(str(base_dir / '../processed-data/train_interactions_fantasy_paranormal.json'))
@@ -50,7 +49,6 @@ class ContentBasedRecommender:
         train_df = self.train_df.with_columns(pl.col("work_id").cast(pl.Utf8))
         grouped_train = train_df.group_by('user_id').agg([pl.col('work_id'), pl.col('rating')])
 
-        # avoids OOM
         if self.max_users is not None:
             grouped_train = grouped_train.head(self.max_users)
 
@@ -181,6 +179,12 @@ class ContentBasedRecommender:
                 json.dump(export_data, f, indent=4)
             print(f"Exported some evaluations to {export_path}")
 
+        return {
+            "hit_rate": hits / total if total > 0 else 0.0,
+            "precision": precision_sum / total if total > 0 else 0.0,
+            "recall": recall_sum / total if total > 0 else 0.0,
+            "total_users": total,
+        }
 
 if __name__ == "__main__":
     recommender = ContentBasedRecommender(max_users=1000)

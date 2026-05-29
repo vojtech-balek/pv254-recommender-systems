@@ -228,7 +228,6 @@ class CF_Recommender():
     def evaluate(self, test_df, top_k=1, export_path=None, book_info=None):
         print(f"Evaluating on test set (top_{top_k})...")
 
-        # RMSE
         users_enc = torch.tensor(test_df["user_id_enc"].to_list(), device=self.device)
         items_enc = torch.tensor(test_df["work_id_enc"].to_list(), device=self.device)
         ratings = torch.tensor(test_df["rating"].to_list(), dtype=torch.float32, device=self.device) / 5.0

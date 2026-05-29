@@ -5,7 +5,6 @@ import torch
 def evaluate_recommender(recommender, train_df, test_df):
     device = recommender.device
 
-    # --- Evaluate: RMSE on test ---
     test_user_ids = test_df["user_id"].to_numpy()
     test_book_ids = test_df["book_id"].to_numpy()
     test_ratings = test_df["rating"].to_numpy() / 5.0
@@ -25,7 +24,6 @@ def evaluate_recommender(recommender, train_df, test_df):
     print(f"\nTest RMSE (normalized [0,1] scale): {rmse:.4f}")
     print(f"Test RMSE (native 1-5 scale):       {rmse_native:.4f}\n")
 
-    # Baseline: global mean predictor
     global_mean = train_df["rating"].mean() / 5.0
     baseline_rmse = np.sqrt(np.mean((global_mean - test_ratings) ** 2))
     print(f"Baseline RMSE (normalized [0,1] scale): {baseline_rmse:.4f}")

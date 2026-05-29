@@ -26,7 +26,6 @@ class ContentBasedRecommender:
         self.dbscan_kwargs = dbscan_kwargs or {"eps": 0.7, "min_samples": 5, "metric": "cosine"}
         self.book_ids = None
 
-        # Resolve paths relative to this file so running from repo root works.
         base_dir = Path(__file__).resolve().parent
         self.books_df = pl.scan_ndjson(str(base_dir / '../processed-data/processed_books_texts.json'))
         self.train_df = pl.scan_ndjson(str(base_dir / '../processed-data/train_interactions_fantasy_paranormal.json'))
@@ -56,7 +55,6 @@ class ContentBasedRecommender:
         train_df = self.train_df.with_columns(pl.col("work_id").cast(pl.Utf8))
         grouped_train = train_df.group_by('user_id').agg([pl.col('work_id'), pl.col('rating')])
 
-        # avoids OOM
         if self.max_users is not None:
             grouped_train = grouped_train.head(self.max_users)
 
@@ -89,10 +87,6 @@ class ContentBasedRecommender:
         return user_profiles
 
     def _aggregate(self, user_books_tfidf, ratings):
-        """Improvement over baseline version of content-based recommender:
-         Use DBSCAN to divide user books into distinct cluster, automatically identifying outliers.
-         This improvement ensures that we can more effectively recommend to users with diverse taste
-         """
         clustering = DBSCAN(**self.dbscan_kwargs).fit(user_books_tfidf)
         labels = clustering.labels_
         unique_labels = set(labels)
@@ -109,7 +103,6 @@ class ContentBasedRecommender:
             cluster_profile = weighted_cluster_books.mean(axis=0)
             cluster_profiles.append(np.asarray(cluster_profile).flatten())
 
-        # If no valid clusters (e.g. all points are noise), fallback to simple average
         if not cluster_profiles:
             weighted_books = user_books_tfidf.multiply(ratings_array)
             fallback_profile = weighted_books.mean(axis=0)
@@ -122,10 +115,8 @@ class ContentBasedRecommender:
         if user_id not in user_profiles:
             return []
 
-        # user_profiles[user_id] is now a list of cluster profiles
         cluster_profiles = user_profiles[user_id]
         
-        # We can calculate scores for each cluster profile
         all_cluster_scores = []
         for profile in cluster_profiles:
             profile = profile.reshape(1, -1)
@@ -138,18 +129,15 @@ class ContentBasedRecommender:
         read_books = train_user_books.get(user_id, set())
         recommended = []
         
-        # Get sorted indices for each cluster
         cluster_sorted_indices = [scores.argsort()[::-1] for scores in all_cluster_scores]
         pointers = [0] * len(cluster_sorted_indices)
         
-        # Interleave recommendations from each cluster
         while len(recommended) < top_n:
             added_in_round = False
             for i, sorted_indices in enumerate(cluster_sorted_indices):
                 if len(recommended) >= top_n:
                     break
                     
-                # Find the next valid book for this cluster
                 while pointers[i] < len(sorted_indices):
                     idx = sorted_indices[pointers[i]]
                     pointers[i] += 1
@@ -161,7 +149,6 @@ class ContentBasedRecommender:
                         break
                         
             if not added_in_round:
-                # All books exhausted (very unlikely, but avoids infinite loop)
                 break
 
         return recommended

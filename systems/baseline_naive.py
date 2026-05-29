@@ -121,6 +121,13 @@ class BaselineRecommender:
                 json.dump(export_data, f, indent=4)
             print(f"Exported some evaluations to {export_path}")
 
+        return {
+            "hit_rate": hits / total if total > 0 else 0.0,
+            "precision": precision_sum / total if total > 0 else 0.0,
+            "recall": recall_sum / total if total > 0 else 0.0,
+            "total_users": total,
+        }
+
 
 if __name__ == "__main__":
     base_dir = Path(__file__).resolve().parent
