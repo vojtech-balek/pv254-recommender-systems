@@ -3,3 +3,6 @@ jupyter
 torch
 scikit-learn
 nltk
+matplotlib
+seaborn
+pyarrow

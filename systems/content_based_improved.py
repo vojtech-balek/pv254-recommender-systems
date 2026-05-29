@@ -1,5 +1,4 @@
 import polars as pl
-import pandas as pd
 from sklearn.feature_extraction.text import TfidfVectorizer
 from sklearn.metrics.pairwise import cosine_similarity
 from sklearn.cluster import DBSCAN
@@ -13,14 +12,18 @@ class ContentBasedRecommender:
     """
     A content-based recommender system
     """
-    def __init__(self, top_n=10, min_ratings=10, max_users=None):
+    def __init__(self, top_n=10, min_ratings=10, max_users=None, vectorizer_kwargs=None, dbscan_kwargs=None):
         self.top_n = top_n
         self.min_ratings = min_ratings
         self.max_users = max_users
         self.book_tf_idf = None
         self.book_id_to_idx = None
         self.book_info = {}
-        self.vectorizer = TfidfVectorizer(max_features=5000)
+        vectorizer_kwargs = vectorizer_kwargs or {}
+        if "max_features" not in vectorizer_kwargs:
+            vectorizer_kwargs["max_features"] = 10000
+        self.vectorizer = TfidfVectorizer(**vectorizer_kwargs)
+        self.dbscan_kwargs = dbscan_kwargs or {"eps": 0.7, "min_samples": 5, "metric": "cosine"}
         self.book_ids = None
 
         # Resolve paths relative to this file so running from repo root works.
@@ -31,14 +34,12 @@ class ContentBasedRecommender:
 
     @staticmethod
     def _norm_book_id(x):
-        # Use string consistently across the whole pipeline to avoid int/str mismatches
         return "" if x is None else str(x)
 
     def build_tf_idf(self):
         pdf = self.books_df.select(["work_id", "combined_text", "title", "author_names", "description"]).collect().to_pandas()
         pdf = pdf.dropna(subset=["combined_text"])
 
-        # Normalize id type: treat book_id (work_id) as string everywhere
         pdf["work_id"] = pdf["work_id"].astype(str)
         pdf = pdf.set_index("work_id")
 
@@ -87,40 +88,34 @@ class ContentBasedRecommender:
         print("Successfully built user profiles!")
         return user_profiles
 
-    @staticmethod
-    def _aggregate(user_books_tfidf, ratings):
+    def _aggregate(self, user_books_tfidf, ratings):
         """Improvement over baseline version of content-based recommender:
          Use DBSCAN to divide user books into distinct cluster, automatically identifying outliers.
          This improvement ensures that we can more effectively recommend to users with diverse taste
          """
-        clustering = DBSCAN(eps=0.7, min_samples=5, metric='cosine').fit(user_books_tfidf)
+        clustering = DBSCAN(**self.dbscan_kwargs).fit(user_books_tfidf)
         labels = clustering.labels_
         unique_labels = set(labels)
-        
+
         cluster_profiles = []
         ratings_array = np.array(ratings).reshape(-1, 1) / 5.0
-        
+
         for k in unique_labels:
-            if k == -1:
-                # Typically, ignore noise, or handle it differently. Let's ignore it if other clusters exist.
-                # Or consider it as its own cluster if we want to retain outliers. We'll ignore noise points.
-                continue
-                
             class_member_mask = (labels == k)
             cluster_tfidf = user_books_tfidf[class_member_mask]
             cluster_ratings = ratings_array[class_member_mask]
-            
+
             weighted_cluster_books = cluster_tfidf.multiply(cluster_ratings)
             cluster_profile = weighted_cluster_books.mean(axis=0)
             cluster_profiles.append(np.asarray(cluster_profile).flatten())
-            
+
         # If no valid clusters (e.g. all points are noise), fallback to simple average
         if not cluster_profiles:
             weighted_books = user_books_tfidf.multiply(ratings_array)
             fallback_profile = weighted_books.mean(axis=0)
             cluster_profiles.append(np.asarray(fallback_profile).flatten())
             labels = np.zeros(len(ratings))
-            
+
         return cluster_profiles, labels
 
     def recommend(self, user_id, user_profiles, train_user_books, top_n=5):
@@ -213,7 +208,7 @@ class ContentBasedRecommender:
                     "author_names": authors,
                     "description": str(info.get("description", ""))
                 }
-                
+
                 if hasattr(self, 'user_book_clusters') and user_id in self.user_book_clusters:
                     if bid in self.user_book_clusters[user_id]:
                         meta["cluster"] = self.user_book_clusters[user_id][bid]
@@ -241,10 +236,16 @@ class ContentBasedRecommender:
             total += 1
 
         if total > 0:
-            print(f"Hit Rate@{top_k}: {hits / total:.4f}")
-            print(f"Precision@{top_k}: {precision_sum / total:.4f}")
-            print(f"Recall@{top_k}: {recall_sum / total:.4f}")
+            hit_rate = hits / total
+            precision = precision_sum / total
+            recall = recall_sum / total
+            print(f"Hit Rate@{top_k}: {hit_rate:.4f}")
+            print(f"Precision@{top_k}: {precision:.4f}")
+            print(f"Recall@{top_k}: {recall:.4f}")
         else:
+            hit_rate = 0.0
+            precision = 0.0
+            recall = 0.0
             print("No users to evaluate.")
 
         if export_path and total > 0:
@@ -252,9 +253,11 @@ class ContentBasedRecommender:
                 json.dump(export_data, f, indent=4)
             print(f"Exported some evaluations to {export_path}")
 
+        return {"hit_rate": hit_rate, "precision": precision, "recall": recall, "total_users": total}
+
 
 if __name__ == "__main__":
-    recommender = ContentBasedRecommender(max_users=1000)
+    recommender = ContentBasedRecommender(max_users=1000, vectorizer_kwargs={'max_features': 5000, 'min_df': 2, 'max_df': 0.9, 'ngram_range': (1, 2), 'sublinear_tf': True})
     recommender.build_tf_idf()
     user_profiles = recommender.build_user_profiles()
     recommender.evaluate(user_profiles, top_k=10, export_path="evaluation_examples.json")

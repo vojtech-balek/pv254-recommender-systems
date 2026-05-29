@@ -28,14 +28,12 @@ class ContentBasedRecommender:
 
     @staticmethod
     def _norm_book_id(x):
-        # Use string consistently across the whole pipeline to avoid int/str mismatches
         return "" if x is None else str(x)
 
     def build_tf_idf(self):
         pdf = self.books_df.select(["work_id", "combined_text", "title", "author_names", "description"]).collect().to_pandas()
         pdf = pdf.dropna(subset=["combined_text"])
 
-        # Normalize id type: treat book_id (work_id) as string everywhere
         pdf["work_id"] = pdf["work_id"].astype(str)
         pdf = pdf.set_index("work_id")
 
@@ -94,7 +92,6 @@ class ContentBasedRecommender:
         user_profile = user_profiles[user_id].reshape(1, -1)
         scores = cosine_similarity(user_profile, self.book_tf_idf).flatten()
 
-        # Sort descending
         top_indices = scores.argsort()[::-1]
 
         read_books = train_user_books.get(user_id, set())
