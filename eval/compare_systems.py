@@ -1,5 +1,8 @@
 import argparse
 from pathlib import Path
+import random
+import numpy as np
+import torch
 
 import matplotlib.pyplot as plt
 import polars as pl
@@ -158,6 +161,12 @@ def plot_metrics(results, output_path):
 
 
 def main():
+    random.seed(42)
+    np.random.seed(42)
+    torch.manual_seed(42)
+    if torch.cuda.is_available():
+        torch.cuda.manual_seed_all(42)
+
     parser = argparse.ArgumentParser(description="Compare recommenders and plot performance.")
     parser.add_argument("--top-k", type=int, default=10)
     parser.add_argument("--max-users", type=int, default=1000)
