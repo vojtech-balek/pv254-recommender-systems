@@ -2,16 +2,17 @@ from pathlib import Path
 
 import torch
 from tqdm import tqdm
+from base_recommender import BaseRecommender
 
-class CF_Recommender:
+class CF_Recommender(BaseRecommender):
     """
     A collaborative filtering recommender that suggests books based on
     user interactions and ratings.
     """
 
     def __init__(self, embedding_dim=64, top_n=10):
+        super().__init__(top_n=top_n)
         self.embedding_dim = embedding_dim
-        self.top_n = top_n
 
         self.W_user = None
         self.W_book = None
@@ -102,3 +103,6 @@ class CF_Recommender:
         top_indices = torch.topk(scores, self.top_n).indices
 
         return [item_ids[i] for i in top_indices.tolist()]
+
+    def evaluate(self, *args, **kwargs):
+        raise NotImplementedError("Evaluation not implemented for CF_Basic")

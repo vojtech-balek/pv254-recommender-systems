@@ -1,21 +1,18 @@
 import polars as pl
 import json
 from pathlib import Path
+from base_recommender import BaseRecommender
 
-class BaselineRecommender:
+class BaselineRecommender(BaseRecommender):
     """
     A naive baseline recommender that suggests the most popular and
     highest-rated books to everyone. This does not personalize
     recommendations per user.
     """
     def __init__(self, top_n=10, min_ratings=100):
-        self.top_n = top_n
+        super().__init__(top_n=top_n)
         self.min_ratings = min_ratings
         self.popular_books = None
-
-    @staticmethod
-    def _norm_book_id(x):
-        return "" if x is None else str(x)
 
     def fit(self, books_path):
         books_df = pl.scan_ndjson(books_path)

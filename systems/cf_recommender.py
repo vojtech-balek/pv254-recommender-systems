@@ -9,16 +9,17 @@ import polars as pl
 import torch.nn.functional as F
 
 import numpy as np
+from base_recommender import BaseRecommender
 
-class CF_Recommender():
+class CF_Recommender(BaseRecommender):
     """
     A collaborative filtering recommender that suggests books (items) based on
     user interactions and ratings.
     """
 
     def __init__(self, top_n=10, embedding_dim=64, objective="rating", use_bias=False):
+        super().__init__(top_n=top_n)
         self.embedding_dim = embedding_dim
-        self.top_n = top_n
         self.objective = objective
         self.use_bias = use_bias
 
@@ -38,10 +39,6 @@ class CF_Recommender():
         print(
             f"Initialized CF_Recommender with top_n={top_n}, embedding_dim={embedding_dim}, use_bias={use_bias}, device={self.device}"
         )
-
-    @staticmethod
-    def _norm_book_id(x):
-        return "" if x is None else str(x)
 
     def _predict(self, user_ids, item_ids):
         """Pointwise predictions for (user, item) pairs."""
@@ -330,4 +327,3 @@ class CF_Recommender():
         print(f"Hits: {len(hits)}/{self.top_n}")
 
         return result
-        

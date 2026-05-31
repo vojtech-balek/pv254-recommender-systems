@@ -5,13 +5,14 @@ from sklearn.metrics.pairwise import cosine_similarity
 import numpy as np
 import json
 from pathlib import Path
+from base_recommender import BaseRecommender
 
-class ContentBasedRecommender:
+class ContentBasedRecommender(BaseRecommender):
     """
     A content-based recommender system
     """
     def __init__(self, top_n=10, min_ratings=10, max_users=None):
-        self.top_n = top_n
+        super().__init__(top_n=top_n)
         self.min_ratings = min_ratings
         self.max_users = max_users
         self.book_tf_idf = None
@@ -25,9 +26,9 @@ class ContentBasedRecommender:
         self.train_df = pl.scan_ndjson(str(base_dir / '../processed-data/train_interactions_fantasy_paranormal.json'))
         self.test_df = pl.scan_ndjson(str(base_dir / '../processed-data/test_interactions_fantasy_paranormal.json'))
 
-    @staticmethod
-    def _norm_book_id(x):
-        return "" if x is None else str(x)
+    def fit(self):
+        self.build_tf_idf()
+        return self.build_user_profiles()
 
     def build_tf_idf(self):
         pdf = self.books_df.select(["work_id", "combined_text", "title", "author_names", "description"]).collect().to_pandas()
@@ -38,10 +39,10 @@ class ContentBasedRecommender:
         pdf = pdf.set_index("work_id")
 
         self.book_ids = pdf.index.values
-        self.book_id_to_idx = {self._norm_book_id(book_id): idx for idx, book_id in enumerate(self.book_ids)}
+        self.book_id_to_idx = {book_id: idx for idx, book_id in enumerate(self.book_ids)}
 
         meta = pdf[["title", "author_names", "description"]].to_dict('index')
-        self.book_info = {self._norm_book_id(k): v for k, v in meta.items()}
+        self.book_info = {k: v for k, v in meta.items()}
 
         self.book_tf_idf = self.vectorizer.fit_transform(pdf["combined_text"])
         print(f"TF-IDF matrix built with shape: {self.book_tf_idf.shape}")
