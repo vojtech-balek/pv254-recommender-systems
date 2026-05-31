@@ -2,7 +2,10 @@ from pathlib import Path
 
 import torch
 from tqdm import tqdm
-from base_recommender import BaseRecommender
+try:
+    from .base_recommender import BaseRecommender
+except ImportError:
+    from base_recommender import BaseRecommender
 
 class CF_Recommender(BaseRecommender):
     """

@@ -5,7 +5,10 @@ from sklearn.metrics.pairwise import cosine_similarity
 import numpy as np
 import json
 from pathlib import Path
-from base_recommender import BaseRecommender
+try:
+    from .base_recommender import BaseRecommender
+except ImportError:
+    from base_recommender import BaseRecommender
 
 class ContentBasedRecommender(BaseRecommender):
     """

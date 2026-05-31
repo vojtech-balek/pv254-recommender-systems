@@ -9,7 +9,10 @@ import polars as pl
 import torch.nn.functional as F
 
 import numpy as np
-from base_recommender import BaseRecommender
+try:
+    from .base_recommender import BaseRecommender
+except ImportError:
+    from base_recommender import BaseRecommender
 
 class CF_Recommender(BaseRecommender):
     """
